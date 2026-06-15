@@ -13,20 +13,20 @@ class AppConfig {
 
   static const ModelSpec vision = ModelSpec(
     fileName: 'clip_vision_unnorm_fp16.onnx',
-    size: 608368672,
-    sha256: '2657fc35a2c498ae79ac8cb245f4a10d08c614a035cb1c31a5e999cafe334a3e',
+    size: 608704678,
+    sha256: '9e90e18ead7d37c788a11eaf1520e9c7832824da9d296bcd98b413f7b9d234b2',
   );
 
   static const ModelSpec head = ModelSpec(
     fileName: 'head.onnx',
-    size: 107139382,
-    sha256: '3ed768dc795a8d03b3d796a6310980075df386e587a74bf5539ba2e75e2da0b7',
+    size: 107139318,
+    sha256: '2dc1488fd69ec4e1dd1c0191bc3f7dcc4513944117a12ec4c1200d731b6b107b',
   );
 
   static const List<ModelSpec> all = [vision, head];
 
   static const String visionInput = 'pixel_values';
-  static const String visionOutput = '/visual_projection/MatMul_output_0';
+  static const String visionOutput = 'image_features';
   static const String headInput = 'image_features';
   static const String headCoords = 'topk_coords';
   static const String headProbs = 'topk_probs';
