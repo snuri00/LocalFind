@@ -547,16 +547,14 @@ class _ImageViewerPage extends StatelessWidget {
         foregroundColor: Colors.white,
         elevation: 0,
       ),
-      body: GestureDetector(
-        onTap: () => Navigator.of(context).maybePop(),
+      body: InteractiveViewer(
+        minScale: 1.0,
+        maxScale: 8.0,
+        boundaryMargin: const EdgeInsets.all(double.infinity),
         child: Center(
-          child: InteractiveViewer(
-            minScale: 1.0,
-            maxScale: 8.0,
-            child: Hero(
-              tag: 'picked-image',
-              child: Image.memory(bytes, fit: BoxFit.contain),
-            ),
+          child: Hero(
+            tag: 'picked-image',
+            child: Image.memory(bytes, fit: BoxFit.contain),
           ),
         ),
       ),
