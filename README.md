@@ -30,6 +30,14 @@ photo
 
 Models: **[ekremabiii/localfind-geoclip-onnx](https://huggingface.co/ekremabiii/localfind-geoclip-onnx)**
 
+## Verify it yourself
+
+The model is encoder-bounded: the correct location is usually among the top candidates, but not always ranked #1. So LocalFind hands the final call to you:
+
+- The map shows the **top-5 candidate locations** as numbered, tappable pins.
+- A candidate selector lets you switch between them (each with its score and a reverse-geocoded place name).
+- **Verify in Street View** opens the selected coordinate in your device's maps app (Google Street View / Apple Look Around) so you can visually confirm the actual spot — a couple of taps to pin the real location.
+
 ## Privacy
 
 - The photo is processed entirely on-device. It is never sent to any server.

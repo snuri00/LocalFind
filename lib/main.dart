@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'src/confidence.dart';
 import 'src/geolocator_engine.dart';
 import 'src/model_repository.dart';
 import 'src/reverse_geocode.dart';
+
+const int kCandidateCount = 5;
 
 void main() {
   runApp(const LocalFindApp());
@@ -54,7 +57,9 @@ class _HomePageState extends State<HomePage> {
   bool _busy = false;
   Uint8List? _imageBytes;
   GeoEstimate? _estimate;
-  String? _placeName;
+
+  int _selected = 0;
+  final Map<int, String?> _placeNames = {};
 
   @override
   void initState() {
@@ -94,6 +99,15 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  List<LatLng> get _candidates {
+    final est = _estimate;
+    if (est == null) return const [];
+    final n = est.candidates.length < kCandidateCount
+        ? est.candidates.length
+        : kCandidateCount;
+    return est.candidates.sublist(0, n);
+  }
+
   Future<void> _pick(ImageSource source) async {
     final file = await _picker.pickImage(source: source);
     if (file == null) return;
@@ -101,7 +115,8 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _imageBytes = bytes;
       _estimate = null;
-      _placeName = null;
+      _placeNames.clear();
+      _selected = 0;
       _busy = true;
       _error = null;
     });
@@ -109,15 +124,38 @@ class _HomePageState extends State<HomePage> {
       final est = await _engine.locate(bytes);
       if (!mounted) return;
       setState(() => _estimate = est);
-      _map.move(est.primary, 13);
-      final place = await _geocoder.describe(est.primary);
-      if (mounted) setState(() => _placeName = place);
+      _selectCandidate(0, animate: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  void _selectCandidate(int index, {bool animate = false}) {
+    final cands = _candidates;
+    if (index < 0 || index >= cands.length) return;
+    setState(() => _selected = index);
+    if (animate) _map.move(cands[index], 16);
+    _ensurePlaceName(index);
+  }
+
+  Future<void> _ensurePlaceName(int index) async {
+    if (_placeNames.containsKey(index)) return;
+    _placeNames[index] = null;
+    final name = await _geocoder.describe(_candidates[index]);
+    if (!mounted) return;
+    setState(() => _placeNames[index] = name);
+  }
+
+  Future<void> _openStreetView(LatLng c) async {
+    final pano = Uri.parse(
+        'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${c.latitude},${c.longitude}');
+    if (await launchUrl(pano, mode: LaunchMode.externalApplication)) return;
+    final search = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=${c.latitude},${c.longitude}');
+    await launchUrl(search, mode: LaunchMode.externalApplication);
   }
 
   @override
@@ -191,6 +229,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildMain() {
     final est = _estimate;
+    final cands = _candidates;
     return Column(
       children: [
         Expanded(
@@ -214,22 +253,25 @@ class _HomePageState extends State<HomePage> {
                           point: est.primary,
                           radius: est.radiusKm * 1000,
                           useRadiusInMeter: true,
-                          color: const Color(0x331B6CF2),
-                          borderColor: const Color(0xAA1B6CF2),
-                          borderStrokeWidth: 1.5,
+                          color: const Color(0x221B6CF2),
+                          borderColor: const Color(0x551B6CF2),
+                          borderStrokeWidth: 1,
                         ),
                       ],
                     ),
-                  if (est != null)
+                  if (cands.isNotEmpty)
                     MarkerLayer(
                       markers: [
-                        Marker(
-                          point: est.primary,
-                          width: 40,
-                          height: 40,
-                          child: const Icon(Icons.location_on,
-                              color: Color(0xFF1B6CF2), size: 40),
-                        ),
+                        for (var i = 0; i < cands.length; i++)
+                          Marker(
+                            point: cands[i],
+                            width: 34,
+                            height: 34,
+                            child: GestureDetector(
+                              onTap: () => _selectCandidate(i, animate: true),
+                              child: _candidatePin(i + 1, i == _selected),
+                            ),
+                          ),
                       ],
                     ),
                 ],
@@ -249,16 +291,40 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _candidatePin(int rank, bool active) {
+    return Container(
+      decoration: BoxDecoration(
+        color: active ? const Color(0xFF1B6CF2) : Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(
+            color: active ? Colors.white : const Color(0xFF1B6CF2), width: 2),
+        boxShadow: const [
+          BoxShadow(color: Color(0x33000000), blurRadius: 4, offset: Offset(0, 2)),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        '$rank',
+        style: TextStyle(
+          color: active ? Colors.white : const Color(0xFF1B6CF2),
+          fontWeight: FontWeight.bold,
+          fontSize: 15,
+        ),
+      ),
+    );
+  }
+
   Widget _buildResultPanel(GeoEstimate? est) {
+    final cands = _candidates;
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (est != null) ...[
+            if (est != null && cands.isNotEmpty) ...[
               Row(
                 children: [
                   if (_imageBytes != null) ...[
@@ -270,29 +336,25 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(width: 12),
                   ],
                   _confidenceChip(est.level),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      '${est.primary.latitude.toStringAsFixed(5)}, '
-                      '${est.primary.longitude.toStringAsFixed(5)}',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 15),
-                    ),
-                  ),
-                  Text('~${est.radiusKm.toStringAsFixed(1)} km'),
+                  const Spacer(),
+                  Text('~${est.radiusKm.toStringAsFixed(1)} km',
+                      style: const TextStyle(color: Colors.black54)),
                 ],
               ),
-              if (_placeName != null) ...[
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Icon(Icons.place_outlined, size: 16),
-                    const SizedBox(width: 6),
-                    Expanded(child: Text(_placeName!)),
-                  ],
-                ),
-              ],
               const SizedBox(height: 12),
+              _candidateSelector(),
+              const SizedBox(height: 10),
+              _selectedDetail(est),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  onPressed: () => _openStreetView(cands[_selected]),
+                  icon: const Icon(Icons.streetview),
+                  label: const Text('Verify in Street View'),
+                ),
+              ),
+              const SizedBox(height: 8),
             ],
             if (_error != null) ...[
               Text(_error!, style: const TextStyle(color: Colors.red)),
@@ -320,6 +382,80 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _candidateSelector() {
+    final est = _estimate!;
+    final cands = _candidates;
+    return SizedBox(
+      height: 36,
+      child: Row(
+        children: [
+          const Text('Candidates',
+              style: TextStyle(fontSize: 12, color: Colors.black54)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: cands.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (_, i) {
+                final active = i == _selected;
+                final pct = (est.probs[i] * 100).toStringAsFixed(0);
+                return ChoiceChip(
+                  selected: active,
+                  onSelected: (_) => _selectCandidate(i, animate: true),
+                  label: Text('${i + 1} · $pct%'),
+                  labelStyle: TextStyle(
+                    fontSize: 12,
+                    fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _selectedDetail(GeoEstimate est) {
+    final c = _candidates[_selected];
+    final place = _placeNames[_selected];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.location_on, size: 18, color: Color(0xFF1B6CF2)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                '${c.latitude.toStringAsFixed(5)}, ${c.longitude.toStringAsFixed(5)}',
+                style:
+                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              ),
+            ),
+            Text('#${_selected + 1} of ${_candidates.length}',
+                style: const TextStyle(fontSize: 12, color: Colors.black54)),
+          ],
+        ),
+        if (place != null) ...[
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 24),
+            child: Text(place, style: const TextStyle(color: Colors.black87)),
+          ),
+        ] else if (_placeNames.containsKey(_selected)) ...[
+          const SizedBox(height: 4),
+          const Padding(
+            padding: EdgeInsets.only(left: 24),
+            child: Text('Looking up place…',
+                style: TextStyle(color: Colors.black38, fontSize: 12)),
+          ),
+        ],
+      ],
     );
   }
 
