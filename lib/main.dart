@@ -149,6 +149,15 @@ class _HomePageState extends State<HomePage> {
     setState(() => _placeNames[index] = name);
   }
 
+  void _openImageViewer() {
+    final bytes = _imageBytes;
+    if (bytes == null) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => _ImageViewerPage(bytes: bytes),
+    ));
+  }
+
   Future<void> _openStreetView(LatLng c) async {
     final pano = Uri.parse(
         'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${c.latitude},${c.longitude}');
@@ -328,10 +337,33 @@ class _HomePageState extends State<HomePage> {
               Row(
                 children: [
                   if (_imageBytes != null) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.memory(_imageBytes!,
-                          width: 44, height: 44, fit: BoxFit.cover),
+                    GestureDetector(
+                      onTap: _openImageViewer,
+                      child: Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Hero(
+                              tag: 'picked-image',
+                              child: Image.memory(_imageBytes!,
+                                  width: 44, height: 44, fit: BoxFit.cover),
+                            ),
+                          ),
+                          Positioned(
+                            right: 2,
+                            bottom: 2,
+                            child: Container(
+                              padding: const EdgeInsets.all(1),
+                              decoration: const BoxDecoration(
+                                color: Color(0xCC000000),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.zoom_in,
+                                  size: 12, color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(width: 12),
                   ],
@@ -499,5 +531,35 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _engine.dispose();
     super.dispose();
+  }
+}
+
+class _ImageViewerPage extends StatelessWidget {
+  final Uint8List bytes;
+  const _ImageViewerPage({required this.bytes});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: GestureDetector(
+        onTap: () => Navigator.of(context).maybePop(),
+        child: Center(
+          child: InteractiveViewer(
+            minScale: 1.0,
+            maxScale: 8.0,
+            child: Hero(
+              tag: 'picked-image',
+              child: Image.memory(bytes, fit: BoxFit.contain),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
