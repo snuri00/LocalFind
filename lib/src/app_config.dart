@@ -9,18 +9,18 @@ class ModelSpec {
 
 class AppConfig {
   static const String hfRepoBase =
-      'https://huggingface.co/ekremabiii/localfind-geoclip-onnx/resolve/main';
+      'https://huggingface.co/ekremabiii/localfind-potsdam-onnx/resolve/main';
 
   static const ModelSpec vision = ModelSpec(
-    fileName: 'clip_vision_unnorm_fp16.onnx',
-    size: 608704678,
-    sha256: '9e90e18ead7d37c788a11eaf1520e9c7832824da9d296bcd98b413f7b9d234b2',
+    fileName: 'streetclip_vision_fp16.onnx',
+    size: 609361438,
+    sha256: 'e693776f48b30a5d813964c3f77ee2f3b2f0dfb23702a5db53ea9f99c6a5d21c',
   );
 
   static const ModelSpec head = ModelSpec(
-    fileName: 'head.onnx',
-    size: 107139318,
-    sha256: '2dc1488fd69ec4e1dd1c0191bc3f7dcc4513944117a12ec4c1200d731b6b107b',
+    fileName: 'potsdam_head.onnx',
+    size: 69794743,
+    sha256: 'dd7418ff8080c74e2910a5eb9fa60a75c8c7af657cd31964a7b765c9b451b7c4',
   );
 
   static const List<ModelSpec> all = [vision, head];
@@ -31,7 +31,7 @@ class AppConfig {
   static const String headCoords = 'topk_coords';
   static const String headProbs = 'topk_probs';
 
-  static const int imageSize = 224;
+  static const int imageSize = 336;
   static const int topK = 20;
 
   static const List<double> clipMean = [0.48145466, 0.4578275, 0.40821073];
